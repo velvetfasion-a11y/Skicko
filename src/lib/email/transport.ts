@@ -17,10 +17,18 @@ export interface EmailTransport {
   send(message: OutboundEmail): Promise<{ providerId: string }>
 }
 
+export function resendApiKey() {
+  return process.env.RESEND_API_KEY?.trim() ?? ""
+}
+
+export function resendConfigured() {
+  return resendApiKey().length > 0
+}
+
 export function transportKind(): EmailTransport["name"] {
   const explicit = process.env.EMAIL_TRANSPORT
-  if (explicit === "resend" || explicit === "ses" || explicit === "console") return explicit
-  if (process.env.RESEND_API_KEY) return "resend"
+  if (explicit === "ses" || explicit === "console") return explicit
+  if (resendConfigured()) return "resend"
   return "console"
 }
 
@@ -38,7 +46,7 @@ export class ConsoleTransport implements EmailTransport {
 export class ResendTransport implements EmailTransport {
   readonly name = "resend" as const
   async send(message: OutboundEmail) {
-    const key = process.env.RESEND_API_KEY
+    const key = resendApiKey()
     if (!key) throw new Error("RESEND_API_KEY is not set.")
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",

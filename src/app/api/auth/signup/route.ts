@@ -21,14 +21,21 @@ export async function POST(req: Request) {
     if (!isEmail(email)) throw new HttpError("Enter a valid email address.", 400)
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) throw new HttpError("An account with that email already exists.", 409)
-    const user = await prisma.user.create({
-      data: { email, name: body.name.trim(), passwordHash: await hashPassword(body.password) },
-    })
-    await createWorkspaceForUser({
-      userId: user.id,
-      workspaceName: body.workspace,
-      senderName: body.name.trim(),
-      replyTo: email,
+    const passwordHash = await hashPassword(body.password)
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { email, name: body.name.trim(), passwordHash },
+      })
+      await createWorkspaceForUser(
+        {
+          userId: created.id,
+          workspaceName: body.workspace,
+          senderName: body.name.trim(),
+          replyTo: email,
+        },
+        tx,
+      )
+      return created
     })
     await createSession(user.id)
     return json({ ok: true })

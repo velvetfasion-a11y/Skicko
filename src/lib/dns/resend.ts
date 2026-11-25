@@ -1,3 +1,4 @@
+import { resendApiKey } from "../email/transport"
 import { recommendedRecords, type DnsRecord } from "./records"
 
 type ResendRecord = {
@@ -30,7 +31,7 @@ export function mapResendRecords(records: ResendRecord[]): DnsRecord[] {
 }
 
 async function resend(path: string, init?: RequestInit) {
-  const key = process.env.RESEND_API_KEY
+  const key = resendApiKey()
   if (!key) return null
   const response = await fetch(`https://api.resend.com${path}`, {
     ...init,
@@ -52,7 +53,7 @@ async function resend(path: string, init?: RequestInit) {
 }
 
 export async function provisionDomain(domain: string, provider: "resend" | "ses") {
-  if (provider === "resend" && process.env.RESEND_API_KEY) {
+  if (provider === "resend" && resendApiKey()) {
     const created = await resend("/domains", { method: "POST", body: JSON.stringify({ name: domain }) })
     if (created) {
       const records = mapResendRecords(created.records || [])
@@ -73,7 +74,7 @@ export async function provisionDomain(domain: string, provider: "resend" | "ses"
 }
 
 export async function refreshResendDomain(providerDomainId: string) {
-  if (!providerDomainId || !process.env.RESEND_API_KEY) return null
+  if (!providerDomainId || !resendApiKey()) return null
   await resend(`/domains/${providerDomainId}/verify`, { method: "POST" }).catch(() => undefined)
   return resend(`/domains/${providerDomainId}`)
 }

@@ -72,6 +72,8 @@ export const en = {
   "settings.address": "Company address",
   "settings.addressHint": "Required on marketing mail. A street address is enough.",
   "settings.workspace": "Workspace name",
+  "settings.connectResend": "Connect Resend",
+  "settings.connectResendBody": "RESEND_API_KEY is not set, so nothing is sent through Resend. Mail stays on the console transport, and signup still works. Add the key and set EMAIL_TRANSPORT=resend when you want real delivery.",
   "domains.title": "Sending domains",
   "domains.lead": "Publish these records at your DNS host, then verify. Marketing mail waits until the domain is verified.",
   "domains.add": "Add domain",

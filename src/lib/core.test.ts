@@ -11,6 +11,8 @@ import { apiSnippets } from "./api/snippets"
 import { canTrustWithoutDns, displayHost, evaluateDns, recommendedRecords } from "./dns/records"
 import { listUnsubscribeHeaders } from "./email/footer"
 import { isLocalPart, parseAddress } from "./email/address"
+import { getTransport, resendConfigured, transportKind } from "./email/transport"
+import { withPoolerParams } from "./database-url"
 
 describe("variables", () => {
   it("uses the fallback when the value is missing", () => {
@@ -162,6 +164,56 @@ describe("dns", () => {
     })
     expect(result.ok).toBe(false)
     expect(result.detail).toContain("DKIM")
+  })
+})
+
+describe("transport without a Resend key", () => {
+  const previousTransport = process.env.EMAIL_TRANSPORT
+  const previousKey = process.env.RESEND_API_KEY
+
+  function restore() {
+    if (previousTransport === undefined) delete process.env.EMAIL_TRANSPORT
+    else process.env.EMAIL_TRANSPORT = previousTransport
+    if (previousKey === undefined) delete process.env.RESEND_API_KEY
+    else process.env.RESEND_API_KEY = previousKey
+  }
+
+  it("falls back to the console when Resend is selected but the key is missing", () => {
+    try {
+      process.env.EMAIL_TRANSPORT = "resend"
+      delete process.env.RESEND_API_KEY
+      expect(resendConfigured()).toBe(false)
+      expect(transportKind()).toBe("console")
+      expect(getTransport().name).toBe("console")
+      process.env.RESEND_API_KEY = "   "
+      expect(transportKind()).toBe("console")
+    } finally {
+      restore()
+    }
+  })
+
+  it("uses Resend only when a key is present", () => {
+    try {
+      delete process.env.EMAIL_TRANSPORT
+      process.env.RESEND_API_KEY = "re_test_key"
+      expect(transportKind()).toBe("resend")
+      process.env.EMAIL_TRANSPORT = "console"
+      expect(transportKind()).toBe("console")
+      process.env.EMAIL_TRANSPORT = "ses"
+      expect(transportKind()).toBe("ses")
+    } finally {
+      restore()
+    }
+  })
+})
+
+describe("postgres pooler urls", () => {
+  it("adds pgbouncer flags only for Neon pooler hosts", () => {
+    const pooled = "postgresql://u:p@ep-abc-pooler.region.aws.neon.tech/neondb?sslmode=require"
+    expect(withPoolerParams(pooled)).toBe(`${pooled}&pgbouncer=true&connection_limit=1`)
+    expect(withPoolerParams(`${pooled}&pgbouncer=true`)).toBe(`${pooled}&pgbouncer=true&connection_limit=1`)
+    const direct = "postgresql://skicko:skicko@127.0.0.1:5432/skicko"
+    expect(withPoolerParams(direct)).toBe(direct)
   })
 })
 

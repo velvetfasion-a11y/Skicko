@@ -102,6 +102,12 @@ export function SettingsView({ data }: { data: SettingsData }) {
       <section className="glass rounded-3xl p-6">
         <h2 className="text-xl font-semibold tracking-tight">{t("domains.title")}</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("domains.lead")}</p>
+        {data.resendConnected ? null : (
+          <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6">
+            <p className="font-medium">{t("settings.connectResend")}</p>
+            <p className="mt-1 text-muted-foreground">{t("settings.connectResendBody")}</p>
+          </div>
+        )}
         <form onSubmit={addDomain} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Input value={domain} onChange={(event) => setDomain(event.target.value)} placeholder={t("domains.placeholder")} required />
           <Button type="submit" disabled={pending} className="rounded-full">{t("domains.add")}</Button>

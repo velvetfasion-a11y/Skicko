@@ -5,6 +5,10 @@ import { hashApiKey } from "../src/lib/api/keys"
 import { recommendedRecords } from "../src/lib/dns/records"
 import { BRAND } from "../src/lib/brand"
 
+if (!process.env.DATABASE_URL_UNPOOLED?.trim() && process.env.DATABASE_URL) {
+  process.env.DATABASE_URL_UNPOOLED = process.env.DATABASE_URL
+}
+
 const prisma = new PrismaClient()
 const demoKey = process.env.DEMO_API_KEY || "sk_live_demo_skicko_local_dev_key"
 

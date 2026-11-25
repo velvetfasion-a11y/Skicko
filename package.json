@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 4317 -H 0.0.0.0",
-    "build": "next build",
+    "build": "export DATABASE_URL_UNPOOLED=\"${DATABASE_URL_UNPOOLED:-$DATABASE_URL}\" && prisma generate && prisma migrate deploy && next build",
     "start": "next start -p 4317 -H 0.0.0.0",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
+    "db:deploy": "export DATABASE_URL_UNPOOLED=\"${DATABASE_URL_UNPOOLED:-$DATABASE_URL}\" && prisma migrate deploy",
+    "db:setup": "export DATABASE_URL_UNPOOLED=\"${DATABASE_URL_UNPOOLED:-$DATABASE_URL}\" && prisma migrate deploy && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

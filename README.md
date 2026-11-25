@@ -6,17 +6,34 @@ The interface is English. Strings go through `translate()` in [`src/lib/i18n/mes
 
 ## Run it locally
 
+Skicko uses Postgres. Point it at a database on your machine, or at a Neon database. The same schema is what Vercel migrates in production.
+
 ```bash
 npm install
 cp .env.example .env
-npx prisma migrate deploy
-npx prisma db seed
+npm run db:setup
 npm run dev
 ```
 
 Open [http://127.0.0.1:4317](http://127.0.0.1:4317).
 
-Demo workspace (local only):
+For a local server, create a role and database, then set both URLs to that direct connection (there is no pooler):
+
+```sql
+CREATE USER skicko WITH PASSWORD 'skicko';
+CREATE DATABASE skicko OWNER skicko;
+```
+
+```bash
+DATABASE_URL="postgresql://skicko:skicko@127.0.0.1:5432/skicko?schema=public"
+DATABASE_URL_UNPOOLED="postgresql://skicko:skicko@127.0.0.1:5432/skicko?schema=public"
+```
+
+For Neon, copy the pooled connection string into `DATABASE_URL` and the direct string into `DATABASE_URL_UNPOOLED`. The Vercel Marketplace Neon integration uses those exact names. If `DATABASE_URL_UNPOOLED` is unset, migrate and the app fall back to `DATABASE_URL`.
+
+`npm run db:setup` applies migrations and loads the demo workspace. On a database you want to keep empty, run `npm run db:deploy` instead. A new account from the signup page creates its own workspace, templates, and form. It does not need the seed.
+
+Demo workspace (local only, after `npm run db:setup`):
 
 - Email: `anna@linden.studio`
 - Password: `skicko-demo`
@@ -32,22 +49,24 @@ The login screen shows a “Continue as Anna” button outside production. With 
 | `npm run test` | Unit tests for variables, inlining, import, suppression, DNS, API snippets |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run db:setup` | Apply migrations and seed |
+| `npm run db:deploy` | Apply Postgres migrations (`prisma migrate deploy`) |
+| `npm run db:setup` | Apply migrations and seed the local demo |
 
 ## Environment
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Prisma connection string. Local default is SQLite: `file:./dev.db` |
+| `DATABASE_URL` | Postgres connection string the app uses. On Neon this is the pooled URL |
+| `DATABASE_URL_UNPOOLED` | Direct Postgres URL for `prisma migrate deploy`. Same as `DATABASE_URL` when you are not using a pooler |
 | `AUTH_SECRET` | Signs unsubscribe links. Set a long random value in production |
 | `EMAIL_TRANSPORT` | `console` (default), `resend`, or `ses` |
-| `RESEND_API_KEY` | Required when the transport is `resend` |
+| `RESEND_API_KEY` | Sends through Resend when set. If it is missing, Skicko stays on the console transport |
 | `RESEND_WEBHOOK_SECRET` | Optional Svix secret for `POST /api/webhooks/resend`. If empty, webhooks are accepted |
 | `APP_URL` | Public origin used in links when a request host is not available |
 | `DEMO_API_KEY` | Local only. When it matches a stored key, the developers page prefills snippets. Ignored in production |
 | `CRON_SECRET` | Bearer token for `GET /api/internal/tick`, which continues campaigns that are still sending |
 
-If `EMAIL_TRANSPORT` is unset and `RESEND_API_KEY` is present, Skicko uses Resend. Otherwise it uses the console transport.
+If `EMAIL_TRANSPORT` is unset and `RESEND_API_KEY` is present, Skicko uses Resend. If `EMAIL_TRANSPORT=resend` but the key is missing or blank, Skicko falls back to the console transport instead of throwing. Settings then shows a Connect Resend notice. Signup, the workspace, and the rest of the app keep working.
 
 ## Resend
 
@@ -108,12 +127,14 @@ Removing someone from a list does not delete the contact. Suppression is a separ
 
 ## Deploy on Vercel
 
-1. Create a Postgres database (Vercel Postgres or Neon).
-2. In `prisma/schema.prisma`, set `provider = "postgresql"` and point `DATABASE_URL` at the pooled connection string. Keep the models as they are. They avoid enums so the same schema runs on SQLite and Postgres.
-3. Run `npx prisma migrate deploy` against that database. Do not run the demo seed in production unless you want the sample workspace.
-4. Set `AUTH_SECRET`, `APP_URL`, `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, and `CRON_SECRET`. Leave `DEMO_API_KEY` unset.
-5. Deploy. `vercel.json` calls `/api/internal/tick` every minute so a campaign keeps sending after the browser tab closes. Vercel Cron sends `Authorization: Bearer $CRON_SECRET`.
-6. Add the Resend webhook URL for the production host.
+The datasource is already Postgres. `directUrl` is `DATABASE_URL_UNPOOLED`, which is what Neon’s Vercel Marketplace integration sets for the direct connection. Prisma Migrate uses that URL. The app uses the pooled `DATABASE_URL`. A pooler host (the hostname contains `-pooler`) gets `pgbouncer=true` and `connection_limit=1` automatically.
+
+1. Add Neon from the Vercel Marketplace so `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are set for Production (and Preview, if you want it). Leave them available at build time.
+2. Set `AUTH_SECRET` to a long random value and `APP_URL` to the public origin. Set `CRON_SECRET` so `/api/internal/tick` stays private. Leave `DEMO_API_KEY` unset.
+3. `RESEND_API_KEY` can wait. Without it, production stays on the console transport and Settings shows Connect Resend. When you are ready, set `RESEND_API_KEY`, `EMAIL_TRANSPORT=resend`, and `RESEND_WEBHOOK_SECRET`.
+4. Deploy. The build command is `prisma generate && prisma migrate deploy && next build`, so a fresh database gets the schema. Do not run the demo seed in production. The first person to sign up gets an empty workspace.
+5. `vercel.json` calls `/api/internal/tick` every minute so a campaign keeps sending after the browser tab closes. Vercel Cron sends `Authorization: Bearer $CRON_SECRET`.
+6. When Resend is connected, add the webhook URL for the production host.
 
 Password accounts and magic links both work. Magic links are sent through the active transport. On the console transport, the sign-in screen also shows the link.
 

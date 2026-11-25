@@ -1,5 +1,5 @@
 import { prisma } from "./prisma"
-import { transportKind } from "./email/transport"
+import { resendConfigured, transportKind } from "./email/transport"
 import { hashApiKey } from "./api/keys"
 import { marketingEligible } from "./audience/eligibility"
 import { parseRecords } from "./dns/records"
@@ -119,6 +119,7 @@ export async function loadSettings(workspaceId: string) {
     },
     domains: domains.map(serializeDomain),
     transport: transportKind(),
+    resendConnected: resendConfigured(),
   }
 }
 
